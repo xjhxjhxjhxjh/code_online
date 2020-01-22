@@ -1,0 +1,53 @@
+1、	文法开始：
+S->int main(){A}
+
+//int a, b; 只能是int char bool
+2、	声明：
+X->YZ;
+Y->int|char|bool
+Z->UZ’
+Z’->,Z|$
+U->idU’
+U’->=L|$
+
+3、	赋值：
+R->id=L;
+R->idO;
+// + - * /  ++ --
+4、	算术运算：
+L->TL’
+L’->+L|-L|$
+T->FT’
+T’->*T|/T|$
+F->(L)
+F->id|num
+O->++|--|$
+Q->idO|$
+
+// || && ！ == != > <
+5、	条件判断
+E->HE’
+E’->&&E|$
+H->GH’
+H’->||H
+H’->$
+G->FDF
+D-><|>|==|!=
+G->(E)
+G->!E
+
+// if else while for
+5、控制语句
+B->if (E){A}else{A}
+B->while(E){A}
+B->for(YZ;G;Q){A}
+6、功能函数
+B->printf(P);
+B->scanf(id);
+B->return
+P->id|str|num
+
+7、复合语句
+A->CA
+C->X|B|R
+A->$

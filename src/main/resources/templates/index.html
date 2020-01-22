@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<html>
+<head>
+    <title>Code Online</title>
+    <!--导入js库-->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.6/ace.js" type="text/javascript"
+            charset="utf-8"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.6/ext-language_tools.js" type="text/javascript"
+            charset="utf-8"></script>
+    <link rel="stylesheet" href="./layui/css/layui.css">
+    <script src="./layui/layui.all.js"></script>
+    <script src="./layui/jquery.min.js"></script>
+</head>
+
+<body>
+<button type="button" class="layui-btn" id="btn1">编译</button>
+<button type="button" class="layui-btn layui-btn-lg" style="position:relative;left:40%">Code Online</button>
+<button type="button" class="layui-btn" id="test1" style="float:right;">
+    <i class="layui-icon">&#xe67c;</i>上传代码
+</button>
+<pre id="code" class="ace_editor" style="min-height:720px; width:100%">
+<textarea class="ace_text-input">
+int main()
+{
+    printf("Hello world!\n");
+    return 0;
+}
+</textarea></pre>
+<button type="button" class="layui-btn layui-btn-lg" style="position:relative;left:45%; display: none;" name="btn">词法分析</button>
+<table class="layui-table" id="tab1"></table>
+<button type="button" class="layui-btn layui-btn-lg" style="position:relative;left:45%; display: none;" name="btn">语法/语义分析</button>
+<textarea id="parser" style="display: none; white-space: pre-line;"></textarea>
+<button type="button" class="layui-btn layui-btn-lg" style="position:relative;left:43%; display: none;" name="btn">语法分析错误信息</button>
+<table class="layui-table" id="tab2"></table>
+<button type="button" class="layui-btn layui-btn-lg" style="position:relative;left:45%; display: none;" name="btn">中间代码</button>
+<table class="layui-table" id="tab3"></table>
+<button type="button" class="layui-btn layui-btn-lg" style="position:relative;left:45%; display: none;" name="btn">目标代码</button>
+<table class="layui-table" id="tab4"></table>
+<button type="button" class="layui-btn layui-btn-lg" style="position:relative;left:45%; display: none;" name="btn">汇编</button>
+<table class="layui-table" id="tab5"></table>
+<script>
+    editor = ace.edit("code");
+    theme = "clouds"
+    language = "c_cpp"
+    editor.setTheme("ace/theme/" + theme);
+    editor.session.setMode("ace/mode/" + language);
+    editor.setFontSize(17);
+    editor.setReadOnly(false);
+    editor.setOption("wrap", "free")
+    ace.require("ace/ext/language_tools");
+    editor.setOptions({
+        enableBasicAutocompletion: true,
+        enableSnippets: true,
+        enableLiveAutocompletion: true
+    });
+</script>
+<script th:inline="none">
+    // 完成上传
+    layui.use('upload', function () {
+        var upload = layui.upload;
+        var uploadInst = upload.render({
+            elem: '#test1'
+            , url: '/upload'
+            , accept: 'file'
+            , done: function (res) {
+                editor.setValue(res.cCode);
+            }
+        });
+    });
+
+    var dataMsg;
+    // 完成运行按钮
+    $("#btn1").click(function () {
+        $.ajax({
+            url: '/run',
+            type: 'POST',
+            async: false,
+            dataType: 'json',
+            data: {"code": editor.getValue()},
+            success: function (data) {
+                if (data.msg == 0) {
+                    dataMsg = data;
+                    alert("line:" + data.result.line + "\n" + data.result.lexerResult.value + "  info:" + data.result.info);
+                    editor.gotoLine(data.result.line);
+                }else {
+                    alert("编译完成");
+                    $("[name='btn']").show();
+                    $("#parser").show();
+                    // 词法分析
+                    table1 = "  <colgroup>\n" +
+                        "    <col width=\"150\">\n" +
+                        "    <col width=\"200\">\n" +
+                        "    <col>\n" +
+                        "  </colgroup>\n" +
+                        "  <thead>\n" +
+                        "    <tr>\n" +
+                        "      <th>id</th>\n" +
+                        "      <th>line</th>\n" +
+                        "      <th>value</th>\n" +
+                        "      <th>type</th>\n" +
+                        "    </tr> \n" +
+                        "  </thead>\n" +
+                        "  <tbody>\n";
+                     for (var i = 0; i < data.resultList.length; i++){
+                         var resultLex = data.resultList[i];
+                         table1 += "<tr>\n" +
+                             " <td>"+resultLex.id+"</td>\n" +" <td>"+resultLex.line+"</td>\n"
+                             +" <td>"+resultLex.value+"</td>\n" +" <td>"+resultLex.type+"</td>\n</tr>";
+                     }
+                    $("#tab1").html(table1);
+
+                    // 语法分析错误
+                    table2 = "  <colgroup>\n" +
+                        "    <col width=\"150\">\n" +
+                        "    <col width=\"200\">\n" +
+                        "    <col>\n" +
+                        "  </colgroup>\n" +
+                        "  <thead>\n" +
+                        "    <tr>\n" +
+                        "      <th>id</th>\n" +
+                        "      <th>line</th>\n" +
+                        "      <th>value</th>\n" +
+                        "      <th>info</th>\n" +
+                        "    </tr> \n" +
+                        "  </thead>\n" +
+                        "  <tbody>\n";
+                    for (var i = 0; i < data.parserErrorList.length; i++){
+                        var errorParser = data.parserErrorList[i];
+                        table2 += "<tr>\n<td>"+errorParser.id+"</td>\n" +" <td>"+errorParser.line+"</td>\n"
+                            +" <td>"+errorParser.lexerResult.value+"</td>\n" +" <td>"+errorParser.info+"</td>\n</tr>";
+                    }
+                    if (data.parserErrorList.length == 0){
+                        table2 += "<tr>\n<td colspan=\"4\" align=\"center\">暂无错误</td>\n</tr>";
+                    }
+                    $("#tab2").html(table2);
+
+                    // 中间代码
+                    table3 = "  <colgroup>\n" +
+                        "    <col width=\"150\">\n" +
+                        "    <col width=\"200\">\n" +
+                        "    <col>\n" +
+                        "  </colgroup>\n" +
+                        "  <thead>\n" +
+                        "    <tr>\n" +
+                        "      <th>id</th>\n" +
+                        "      <th>op</th>\n" +
+                        "      <th>arg1</th>\n" +
+                        "      <th>arg2</th>\n" +
+                        "      <th>result</th>\n" +
+                        "    </tr> \n" +
+                        "  </thead>\n" +
+                        "  <tbody>\n";
+                    for (var i = 0; i < data.intermediateCodesList.length; i++){
+                        var intermediateCode = data.intermediateCodesList[i];
+                        table3 += "<tr>\n<td>"+intermediateCode.id+"</td>\n" +" <td>"+intermediateCode.op+"</td>\n"
+                            +" <td>"+intermediateCode.arg1+"</td>\n" +" <td>"+intermediateCode.arg2+
+                            "</td><td>"+intermediateCode.result+"</td>\n</tr>";
+                    }
+                    if (data.intermediateCodesList.length == 0){
+                        table3 += "<tr>\n<td colspan=\"5\" align=\"center\">暂无结果</td>\n</tr>";
+                    }
+                    $("#tab3").html(table3);
+
+                    // 目标代码
+                    table4 = "  <colgroup>\n" +
+                        "    <col width=\"150\">\n" +
+                        "    <col width=\"200\">\n" +
+                        "    <col>\n" +
+                        "  </colgroup>\n" +
+                        "  <thead>\n" +
+                        "    <tr>\n" +
+                        "      <th>id</th>\n" +
+                        "      <th>op</th>\n" +
+                        "      <th>registerId</th>\n" +
+                        "      <th>data</th>\n" +
+                        "    </tr> \n" +
+                        "  </thead>\n" +
+                        "  <tbody>\n";
+                    for (var i = 0; i < data.targetCodes.length; i++){
+                        var targetCodes = data.targetCodes[i];
+                        table4 += "<tr>\n<td>"+targetCodes.cnt+"</td>\n" +" <td>"+targetCodes.op+"</td>\n"
+                            +" <td>"+targetCodes.registerId+"</td>\n" +" <td>"+targetCodes.data+
+                            "</td>\n</tr>";
+                    }
+                    if (data.targetCodes.length == 0){
+                        table4 += "<tr>\n<td colspan=\"4\" align=\"center\">暂无结果</td>\n</tr>";
+                    }
+                    $("#tab4").html(table4);
+
+
+                    // 汇编
+                    table5 = "  <colgroup>\n" +
+                        "    <col width=\"150\">\n" +
+                        "    <col width=\"200\">\n" +
+                        "    <col>\n" +
+                        "  </colgroup>\n" +
+                        "  <thead>\n" +
+                        "    <tr>\n" +
+                        "      <th>id</th>\n" +
+                        "      <th>op</th>\n" +
+                        "      <th>arg1</th>\n" +
+                        "      <th>arg2</th>\n" +
+                        "    </tr> \n" +
+                        "  </thead>\n" +
+                        "  <tbody>\n";
+                    for (var i = 0; i < data.assembler.length; i++){
+                        var assembler = data.assembler[i];
+                        table5 += "<tr>\n<td>"+assembler.cnt+"</td>\n" +" <td>"+assembler.op+"</td>\n"
+                            +" <td>"+assembler.registerId+"</td>\n" +" <td>"+assembler.data+
+                            "</td>\n</tr>";
+                    }
+                    if (data.assembler.length == 0){
+                        table5 += "<tr>\n<td colspan=\"4\" align=\"center\">暂无结果</td>\n</tr>";
+                    }
+                    $("#tab5").html(table5);
+
+                     // 语法分析
+                    layui.use('layedit', function(){
+                        var layedit = layui.layedit;
+                        var index = layedit.build('parser');
+                        height: 180;
+                        layedit.setContent(index,data.info);
+                    });
+
+                }
+            },
+            error: function (data) {
+            }
+        });
+        return false;
+    });
+</script>
+</body>
+</html>
